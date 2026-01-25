@@ -24,24 +24,32 @@ jobs:
         uses: matlab-actions/run-command@v2
         with:
           command: |
-            % 1. Show us where we are (Debug)
-            fprintf('--- Current Directory Contents ---\n');
-            ls -R
-
-            % 2. Attempt to add paths
-            addpath(genpath(pwd)); 
-
-            % 3. Check for a book function
+            % 1. Setup paths
+            addpath(genpath('core_book_code'));
+            addpath(genpath('website_code'));
+            
+            % 2. Verify visibility (Already confirmed by your last run)
             if exist('ft2', 'file')
-                fprintf('Success: core_book_code found.\n');
-            else
-                fprintf('Warning: core_book_code NOT found in path.\n');
+                fprintf('SUCCESS: Private book functions are in the path.\n');
             end
-
-            % 4. Run Linting
-            % Note: Using '.' to check everything currently visible
-            results = checkcode('website_code/lib', '-all');
-            if ~isempty(results)
-                disp('Linting issues:');
-                disp(results);
+            
+            % 3. Run Linter on your supplemental library files individually
+            % This avoids the "Unable to open file" error for the folder
+            libFiles = dir('website_code/lib/*.m');
+            for i = 1:length(libFiles)
+                fprintf('Linting: %s\n', libFiles(i).name);
+                diag = checkcode(fullfile(libFiles(i).folder, libFiles(i).name), '-all');
+                if ~isempty(diag), disp(diag); end
+            end
+            
+            % 4. Functional Test: Run an example and catch errors
+            try
+                fprintf('Executing checkXcorr...\n');
+                % Navigate to the example folder so it can find local dependencies
+                cd('website_code/examples/Chapter3/basicCorrelation');
+                checkXcorr; 
+                fprintf('SUCCESS: checkXcorr executed without errors.\n');
+            catch ME
+                fprintf('FAILURE: checkXcorr crashed with error: %s\n', ME.message);
+                exit(1); % Ensure the GitHub Action shows a "Fail" if the math is broken
             end
