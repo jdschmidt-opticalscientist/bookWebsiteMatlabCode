@@ -31,8 +31,8 @@ jobs:
             % 2. Attempt to add paths
             addpath(genpath(pwd)); 
 
-            % 3. Check for a book function (Update 'prop_tf' if you use a different one as your 'anchor')
-            if exist('prop_tf', 'file')
+            % 3. Check for a book function
+            if exist('ft2', 'file')
                 fprintf('Success: core_book_code found.\n');
             else
                 fprintf('Warning: core_book_code NOT found in path.\n');
