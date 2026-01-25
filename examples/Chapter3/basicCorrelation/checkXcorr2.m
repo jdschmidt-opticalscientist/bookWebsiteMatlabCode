@@ -1,4 +1,8 @@
-% checkXcorr2.m
+% checkXcorr2.m Supplemental code for "Numerical Simulation of Optical 
+% Wave Propagation with Examples in MATLAB"
+% 
+% Copyright (c) 2026, Jason D. Schmidt. Licensed under BSD 3-Clause.
+% Code from the book (e.g., ft.m) copyright SPIE.
 
 % define window and spatial grid:
 N = 512; % number of grid points per side
