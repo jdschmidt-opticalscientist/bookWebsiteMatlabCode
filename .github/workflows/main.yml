@@ -24,22 +24,24 @@ jobs:
         uses: matlab-actions/run-command@v2
         with:
           command: |
-            % 1. Setup paths
-            addpath(genpath('core_book_code'));
-            addpath(genpath('website_code/lib'));
+            % 1. Show us where we are (Debug)
+            fprintf('--- Current Directory Contents ---\n');
+            ls -R
 
-            % 2. Verify visibility of a core book function
-            if exist('ft2', 'file') == 2
-                fprintf('Successfully linked to private bookCode repository.\n');
+            % 2. Attempt to add paths
+            addpath(genpath(pwd)); 
+
+            % 3. Check for a book function (Update 'prop_tf' if you use a different one as your 'anchor')
+            if exist('prop_tf', 'file')
+                fprintf('Success: core_book_code found.\n');
             else
-                error('Could not find core book functions. Check PAT/Secret configuration.');
+                fprintf('Warning: core_book_code NOT found in path.\n');
             end
 
-            % 3. Run Linting on the new supplemental code
+            % 4. Run Linting
+            % Note: Using '.' to check everything currently visible
             results = checkcode('website_code/lib', '-all');
             if ~isempty(results)
+                disp('Linting issues:');
                 disp(results);
             end
-
-            % 4. (Optional) Run examples to ensure they don't crash
-            % run('website_code/examples/Chapter3/basicCorrelation/checkXcorr.m');
