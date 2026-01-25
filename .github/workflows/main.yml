@@ -1,0 +1,45 @@
+name: MATLAB CI
+on: [push, pull_request]
+
+jobs:
+  run-quality-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out website code (Public)
+        uses: actions/checkout@v4
+        with:
+          path: website_code
+
+      - name: Check out book code (Private)
+        uses: actions/checkout@v4
+        with:
+          repository: jdschmidt-opticalscientist/bookCode
+          token: ${{ secrets.BOOK_CODE_TOKEN }}
+          path: core_book_code
+
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2
+
+      - name: Run Tests and Linting
+        uses: matlab-actions/run-command@v2
+        with:
+          command: |
+            % 1. Setup paths
+            addpath(genpath('core_book_code'));
+            addpath(genpath('website_code/lib'));
+
+            % 2. Verify visibility of a core book function
+            if exist('ft2', 'file') == 2
+                fprintf('Successfully linked to private bookCode repository.\n');
+            else
+                error('Could not find core book functions. Check PAT/Secret configuration.');
+            end
+
+            % 3. Run Linting on the new supplemental code
+            results = checkcode('website_code/lib', '-all');
+            if ~isempty(results)
+                disp(results);
+            end
+
+            % 4. (Optional) Run examples to ensure they don't crash
+            % run('website_code/examples/Chapter3/basicCorrelation/checkXcorr.m');
