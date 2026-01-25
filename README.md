@@ -35,6 +35,6 @@ Note: This license does not apply to the original code provided by SPIE with the
 
 ## Development Quality
 
-![MATLAB CI](https://github.com/jdschmidt/bookWebsiteMatlabCode/actions/workflows/main.yml/badge.svg)
+![MATLAB CI](https://github.com/jdschmidt-opticalscientist/bookWebsiteMatlabCode/actions/workflows/main.yml/badge.svg?branch=main)
 
 We use GitHub Actions to ensure code quality through automated linting and unit testing.
