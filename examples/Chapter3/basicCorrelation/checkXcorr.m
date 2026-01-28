@@ -7,8 +7,8 @@
 clear variables; close all; clc;
 
 M = 32; % number of grid points
-Lt = 2.7;  % grid size [m]
-dt = Lt/M; % grid spacing [m]
+T = 2.7;  % grid size [m]
+dt = T/M; % grid spacing [m]
 t = (-M/2 : M/2-1) * dt;
 mLags = (-(M-1) : (M-1)); % lag index for xcorr
 t2 = mLags * dt; % sample times [s]
@@ -19,7 +19,7 @@ varTh = 2.3; % variance
 corrTh = varTh * exp(-pi*t2.^2/w^2); % covariance
 
 % set up theoretical PSD:
-df = 1/Lt;   % frequency grid spacing [1/m]
+df = 1/T;   % frequency grid spacing [1/m]
 f = (-M/2 : M/2-1) * df;
 psdThFcn = @(F) varTh * w*exp(-pi*F.^2*w^2);
 psdTh = psdThFcn(f);
@@ -35,7 +35,7 @@ gMean = 0;
 gMeanSqr = 0;
 % for FT-based calculations:
 gPad = zeros(1, 2*M); % zero-padded array for g
-dfBig = 1/(2*Lt);   % frequency grid spacing for double-size g [1/m]
+dfBig = 1/(2*T);   % frequency grid spacing for double-size g [1/m]
 idxFill = (-M/2 : M/2-1) + M+1; % indices of grBig to fill
 mLagsFT = (-M : M-1); % lag index for FT-based correlation
 corrGBig = zeros(1, 2*M);
@@ -94,7 +94,7 @@ exportgraphics(f1, 'checkXcorr.png');
 % unbiased with FT:
 f2 = figure(2); clf;
 plot(t2, corrTh, 'k', t2, rUnbiased, 'r--', ...
-    mLagsFT*dt, corrGBig/Lt*M./(M-abs(mLagsFT)), 'g-.', 'LineWidth', 1.5);
+    mLagsFT*dt, corrGBig/T*M./(M-abs(mLagsFT)), 'g-.', 'LineWidth', 1.5);
 grid('on');
 xlabel('Time Lag [s]');
 ylabel('Auto-Correlation');
