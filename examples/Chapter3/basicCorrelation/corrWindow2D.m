@@ -12,66 +12,77 @@ dx = 1; % grid spacing [m]
 x = (-N/2 : N/2-1) * dx; % spatial grid
 
 % count the number of nonzero entries, output to command line:
-sprintf('There are %i nonzero entries in w', sum(w(:)))
+fprintf('There are %i nonzero entries in w\n', sum(w(:)));
 
 % show original window:
-figure(1); clf;
+f1 = figure(1); clf;
 imagesc(x, x, w);
 axis('image', 'xy');
 colorbar;
 xlabel('x [m]');
 ylabel('y [m]');
+exportgraphics(f1, 'mask2D.png');
 
 % compute autocorrelation from original window using Matlab's xcorr2:
 c1 = xcorr2(w, w);
-% size of c1 is 2N-1 by 2N-1
 xCor2 = (-N+1 : N-1)*dx; % spatial grid for xcorr2 result
+
 % find the max value and its row & column:
 [M, I] = max(c1(:));
 [row, col] = ind2sub([2*N-1, 2*N-1], I);
 
 % show window correlation from xcorr2:
-figure(2); clf;
+f2 = figure(2); clf;
 imagesc(xCor2, xCor2, c1);
 axis('image', 'xy');
 colorbar;
 xlabel('x [m]');
 ylabel('y [m]');
 title(sprintf('Max value is %i, in row %i and col %i', M, row, col));
+exportgraphics(f2, 'maskCorr_xcorr2.png');
 
 %% FT-based calculation of the correlation
-
-% define zero-padded window and grid so that non-circular correlation is
-% computed:
-NPad = 2*N; % number of grid points in zero-padded array
-wPad = zeros(NPad, NPad); % making zero-padded array
-idxOrig = (-N/2 : N/2-1) + N+1; % indices for original window
-wPad(idxOrig, idxOrig) = w; % fill center of zero-padded array
-xPad = (-NPad/2 : NPad/2-1)*dx; % coordinates for zero-padded array
-
-% show padded window:
-figure(3); clf;
-imagesc(xPad, xPad, wPad);
-axis('image', 'xy');
-colorbar;
-xlabel('x [m]');
-ylabel('y [m]');
+% define zero-padded window and grid so that non-circular correlation is computed:
+NPad = 2*N; 
+wPad = zeros(NPad, NPad); 
+idxOrig = (-N/2 : N/2-1) + N+1; 
+wPad(idxOrig, idxOrig) = w; 
+xPad = (-NPad/2 : NPad/2-1)*dx; 
 
 % compute autocorrelation from padded window using Fourier transforms:
-df = 1/NPad; % spatial frequency grid spacing
+df = 1/(NPad*dx); % Corrected df for zero-padded grid
 c2 = ift2(abs(ft2(wPad, dx)).^2, df);
-% wFT = ft2(wPad, dx);
-% wFtFlip = ft2(flip(flip(wFT,1),2), dx);
-% c2 = ift2(wFT.*wFtFlip, df);
+
 % find the max value and its row & column:
-[M, I] = max(c2(:));
-[row, col] = ind2sub([2*N, 2*N], I);
+[M2, I2] = max(c2(:));
+[row2, col2] = ind2sub([2*N, 2*N], I2);
 
 % show window correlation from Fourier transform:
-figure(4); clf;
+f4 = figure(4); clf;
 imagesc(xPad, xPad, abs(c2));
 axis('image', 'xy');
 colorbar;
 xlabel('x [m]');
 ylabel('y [m]');
-title(sprintf('Max value is %i, in row %i and col %i', M, row, col));
+title(sprintf('FT Max: %0.2f at (%i, %i)', M2, row2, col2));
+exportgraphics(f4, 'maskCorr_FT.png');
+
+%% Combined Figure for corrUnbiased2D.html
+f5 = figure(5); clf;
+set(f5, 'OuterPosition', [100 100 900 400]);
+tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+nexttile;
+imagesc(x, x, w);
+axis image xy; colorbar;
+xlabel('x [m]'); ylabel('y [m]');
+title('Original Mask (w)');
+
+nexttile;
+% Using the FT result for the unbiased map
+imagesc(xPad, xPad, abs(c2));
+axis image xy; colorbar;
+xlabel('x [m]'); ylabel('y [m]');
+title('Autocorrelation of Mask (A)');
+
+exportgraphics(f5, 'checkXcorr2_mask.png');
