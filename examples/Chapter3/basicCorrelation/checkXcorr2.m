@@ -1,4 +1,4 @@
-% checkXcorr2D.m Supplemental code for "Numerical Simulation of Optical 
+% checkXcorr2.m Supplemental code for "Numerical Simulation of Optical 
 % Wave Propagation with Examples in MATLAB"
 % 
 % Copyright (c) 2026, Jason D. Schmidt. Licensed under BSD 3-Clause.
