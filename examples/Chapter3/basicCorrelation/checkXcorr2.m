@@ -1,77 +1,121 @@
-% checkXcorr2.m Supplemental code for "Numerical Simulation of Optical 
+% checkXcorr2D.m Supplemental code for "Numerical Simulation of Optical 
 % Wave Propagation with Examples in MATLAB"
 % 
 % Copyright (c) 2026, Jason D. Schmidt. Licensed under BSD 3-Clause.
-% Code from the book (e.g., ft.m) copyright SPIE.
+% Code from the book (e.g., ft2.m) copyright SPIE.
+clear variables; close all; clc;
 
-% define window and spatial grid:
-N = 512; % number of grid points per side
-w = ones(N); % window that covers the entire grid
-w(201:400,301:500) = 0;
-dx = 1; % grid spacing [m]
-x = (-N/2 : N/2-1) * dx; % spatial grid
+N = 64;           % number of grid points per side
+L = 5.0;          % grid size [m]
+dx = L/N;         % grid spacing [m]
+x = (-N/2 : N/2-1) * dx;
+[X, Y] = meshgrid(x);
 
-% count the number of nonzero entries, output to command line:
-sprintf('There are %i nonzero entries in w', sum(w(:)))
+% set up theoretical covariance:
+w_sig = 8*dx;     % width parameter for Gaussian covariance [m]
+varTh = 1.5;      % theoretical variance
+lags = (-(N-1) : (N-1)) * dx;
+[tauX, tauY] = meshgrid(lags);
+% Theoretical 2-D Covariance:
+corrTh2D = varTh * exp(-pi * (tauX.^2 + tauY.^2) / w_sig^2);
 
-% show original window:
-figure(1); clf;
-imagesc(x, x, w);
-axis('image', 'xy');
-colorbar;
-xlabel('x [m]');
-ylabel('y [m]');
+% set up theoretical PSD function handle:
+psdThFcn = @(fx, fy) varTh * w_sig^2 * exp(-pi * (fx.^2 + fy.^2) * w_sig^2);
 
-% compute autocorrelation from original window using Matlab's xcorr2:
-c1 = xcorr2(w, w);
-% size of c1 is 2N-1 by 2N-1
-xCor2 = (-N+1 : N-1)*dx; % spatial grid for xcorr2 result
-% find the max value and its row & column:
-[M, I] = max(c1(:));
-[row, col] = ind2sub([2*N-1, 2*N-1], I);
+% Ensemble parameters:
+NR = 500; % number of random draws
+Npad = 2*N;
+avgCorrUnbiased = zeros(Npad, Npad); 
 
-% show window correlation from xcorr2:
-figure(2); clf;
-imagesc(xCor2, xCor2, c1);
-axis('image', 'xy');
-colorbar;
-xlabel('x [m]');
-ylabel('y [m]');
-title(sprintf('Max value is %i, in row %i and col %i', M, row, col));
+% Use a simple square mask covering the whole grid for this check
+mask = ones(N); 
+areamask = sum(mask(:)) * dx^2;
 
-%% FT-based calculation of the correlation
+% For FT-based unbiasing:
+df = 1/(Npad * dx);
 
-% define zero-padded window and grid so that non-circular correlation is
-% computed:
-NPad = 2*N; % number of grid points in zero-padded array
-wPad = zeros(NPad, NPad); % making zero-padded array
-idxOrig = (-N/2 : N/2-1) + N+1; % indices for original window
-wPad(idxOrig, idxOrig) = w; % fill center of zero-padded array
-xPad = (-NPad/2 : NPad/2-1)*dx; % coordinates for zero-padded array
+% Pre-calculate mask autocorrelation (the unbiasing denominator)
+maskPad = zeros(Npad, Npad);
+maskPad(1:N, 1:N) = mask; 
+W = ft2(maskPad, dx);
+maskCorr = ift2(abs(W).^2, df);
 
-% show padded window:
-figure(3); clf;
-imagesc(xPad, xPad, wPad);
-axis('image', 'xy');
-colorbar;
-xlabel('x [m]');
-ylabel('y [m]');
+% Threshold to avoid division by zero at edges
+idxValid = abs(maskCorr) >= dx^2 / areamask;
 
-% compute autocorrelation from padded window using Fourier transforms:
-df = 1/NPad; % spatial frequency grid spacing
-c2 = ift2(abs(ft2(wPad, dx)).^2, df);
-% wFT = ft2(wPad, dx);
-% wFtFlip = ft2(flip(flip(wFT,1),2), dx);
-% c2 = ift2(wFT.*wFtFlip, df);
-% find the max value and its row & column:
-[M, I] = max(c2(:));
-[row, col] = ind2sub([2*N, 2*N], I);
+fprintf('Running ensemble of %i realizations...\n', NR);
 
-% show window correlation from Fourier transform:
-figure(4); clf;
-imagesc(xPad, xPad, abs(c2));
-axis('image', 'xy');
-colorbar;
-xlabel('x [m]');
-ylabel('y [m]');
-title(sprintf('Max value is %i, in row %i and col %i', M, row, col));
+for idx = 1 : NR
+    % 1. generate 2-D random process realization:
+    [phz_lo, phz_hi] = ftShGaussianProc2(N, dx, psdThFcn);
+    g = phz_lo + phz_hi;
+    
+    % 2. remove mean of the realization to compute covariance:
+    g = g - mean(g(:));
+    
+    % 3. Apply mask and manually zero-pad:
+    gPad = zeros(Npad, Npad);
+    gPad(1:N, 1:N) = g .* mask;
+    
+    % 4. FT-based correlation (Correlation Theorem):
+    G = ft2(gPad, dx);
+    rawCorr = ift2(abs(G).^2, df);
+    
+    % 5. unbias using the mask autocorrelation:
+    unbiasedRealization = zeros(Npad, Npad);
+    unbiasedRealization(idxValid) = rawCorr(idxValid) ./ maskCorr(idxValid);
+    
+    % accumulate ensemble average:
+    avgCorrUnbiased = avgCorrUnbiased + unbiasedRealization / NR;
+end
+
+% --- DATA ANALYSIS & PLOTTING ---
+
+% extract 1-D slice for plotting comparison (along tau_y = 0)
+centerIdx = N + 1;
+sliceRange = (centerIdx - (N-1)) : (centerIdx + (N-1));
+corrSlice = real(avgCorrUnbiased(centerIdx, sliceRange));
+
+% Define grids for radial averaging
+lagsPad = (-Npad/2 : Npad/2-1) * dx;
+[tauXPad, tauYPad] = meshgrid(lagsPad);
+
+% Perform azimuthal average
+[rvals, radialAvg] = azimuthal_average(tauXPad, tauYPad, real(avgCorrUnbiased));
+
+% Theoretical radial function for comparison
+corrThRadial = varTh * exp(-pi * rvals.^2 / w_sig^2);
+
+% FIGURE 1: Realization and 1-D Slice
+f1 = figure(1); clf;
+set(f1, 'OuterPosition', [200 200 1000 450]);
+tlayout1 = tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+nexttile;
+imagesc(x, x, g);
+axis image xy; colorbar;
+xlabel('x [m]'); ylabel('y [m]');
+title('Final Signal Realization');
+
+nexttile;
+plot(lags, corrTh2D(N, :), 'k-', 'LineWidth', 2); hold on;
+plot(lags, corrSlice, 'r--', 'LineWidth', 1.5);
+grid on; xlim([-L L]);
+xlabel('Lag \Delta x [m]');
+ylabel('Autocovariance');
+legend('Theory', '2-D Unbiased (Slice)', 'Location', 'NorthEast');
+title(sprintf('Ensemble Average (%i draws)', NR));
+
+% FIGURE 2: Azimuthal Average Comparison
+f2 = figure(2); clf;
+plot(rvals, corrThRadial, 'k-', 'LineWidth', 2); hold on;
+plot(rvals, radialAvg, 'r--', 'LineWidth', 1.5);
+grid on; xlim([0 L]);
+xlabel('Radial Lag r [m]');
+ylabel('Autocovariance');
+legend('Theory', 'Azimuthal Average');
+title('Radial Statistics Verification');
+
+% export figures for use in the HTML article:
+exportgraphics(f1, 'checkXcorr2D_Results.png');
+exportgraphics(f2, 'checkXcorr2D_Radial.png');

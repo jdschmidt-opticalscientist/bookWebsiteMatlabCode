@@ -21,5 +21,5 @@ del_f = 1/(N*delta);   % frequency grid spacing [1/m]
 % random draws of Fourier coefficients:
 cn = complex(randn(N, 1), randn(N, 1)) .* sqrt(PSD*del_f);
 % synthesize the process:
-g = real(ift(cn, 1));
+g = real(ift2(cn, 1));
 end
