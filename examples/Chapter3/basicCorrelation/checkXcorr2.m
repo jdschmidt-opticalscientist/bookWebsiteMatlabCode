@@ -32,7 +32,8 @@ areamask = sum(mask(:)) * dx^2;
 % --- Unbiasing Denominator (Aperture Autocorrelation) ---
 df = 1/(Npad * dx); % frequency spacing [cyc/m]
 maskPad = zeros(Npad, Npad);
-maskPad(1:N, 1:N) = mask; 
+idxCenter = (1:N) + N/2;
+maskPad(idxCenter,idxCenter) = mask; 
 W = ft2(maskPad, dx);
 maskCorr = ift2(abs(W).^2, df);
 
@@ -46,20 +47,21 @@ for idx = 1 : NR
     [phz_lo, phz_hi] = ftShGaussianProc2(N, dx, psdThFcn);
     g = phz_lo + phz_hi;
     
-    % 2. Apply circular mask and zero-pad
+    % 2. Prepare the padded and masked arrays
+    % Note: mPad is defined outside the loop as zeros(Npad, Npad)
+    % with the mask in the top-left (or center) NxN block.
     gPad = zeros(Npad, Npad);
-    gPad(1:N, 1:N) = g .* mask;
+    gPad(idxCenter,idxCenter) = g .* mask;
     
-    % 3. FT-based correlation
-    G = ft2(gPad, dx);
-    rawCorr = ift2(abs(G).^2, df);
+    % 3. Use the new function for the unbiased correlation
+    % We pass the padded signal and padded mask.
+    [unbiasedRealization, rawCorr] = corr2_ft(gPad, gPad, maskPad, dx);
     
-    % Accumulate results
+    % 4. Accumulate results
+    % avgCorrNone stores the "raw" (biased) correlation for comparison
     avgCorrNone = avgCorrNone + rawCorr / NR;
     
-    % 4. Unbias
-    unbiasedRealization = zeros(Npad, Npad);
-    unbiasedRealization(idxValid) = rawCorr(idxValid) ./ maskCorr(idxValid);
+    % avgCorrUnbiased stores the unmasked, scaled correlation
     avgCorrUnbiased = avgCorrUnbiased + unbiasedRealization / NR;
 end
 
