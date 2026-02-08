@@ -18,30 +18,36 @@ function [phz_lo, phz_hi] = ftShGaussianProc1(M, dt, psdThFcn)
 % Copyright (c) 2026, Jason D. Schmidt. Licensed under BSD 3-Clause.
 % Code from the book (e.g., ftGaussianProc1.m) copyright SPIE.
 
-% high-frequency screen from FFT method:
-phz_hi = ftGaussianProc1(M, dt, psdThFcn);
+% 1. High-frequency component (FFT method)
+% Zero the DC bin to allow subharmonics to handle the low-frequency limit
+zeroDC = true;
+phz_hi = ftGaussianProc1(M, dt, psdThFcn, zeroDC);
 
-% subharmonics:
+% 2. Low-frequency component (Subharmonics)
 x = (-M/2 : M/2-1).' * dt;
 D = M*dt;
-% initialize low-freq screen:
 phz_lo = zeros(M, 1);
-% loop over frequency grids with spacing 1/(3^p*D)
-NP = 5;
+NP = 3; % Typically 3 levels are sufficient for Gaussian processes
+
 for p = 1:NP
-    % setup the PSD:
-    del_f = 1 / (3^p*D); % frequency grid spacing [1/m]
-    fx = linspace(-0.5, 0.5, 3) * del_f;
-    PSD_phi = psdThFcn(fx);
-    %PSD_phi(2) = 0;
-    % random draws of Fourier coefficients:
-    cn = complex(randn(1,3), randn(1,3)) .* sqrt(PSD_phi*del_f);
+    df_p = 1 / (3^p * D); 
+    fx = [-1, 0, 1] * df_p;
+    PSD_p = psdThFcn(fx);
+    
+    cn = complex(randn(1, 3), randn(1, 3)) .* sqrt(PSD_p * df_p);
+    
     SH = zeros(M, 1);
-    % loop over frequencies on this grid:
     for ii = 1:3
-        SH = SH + cn(ii) * exp(1i*2*pi*fx(ii)*x);
+        % SPECTRAL PARTITIONING:
+        % Only include the center bin (ii=2) at the very last (smallest) 
+        % level to represent the ensemble mean variance exactly once.
+        if (ii == 2) && (p < NP)
+            continue; 
+        end
+        SH = SH + cn(ii) * exp(1i * 2 * pi * fx(ii) * x);
     end
-    phz_lo = phz_lo + SH;   % accumulate subharmonics
+    phz_lo = phz_lo + SH;
 end
-phz_lo = real(phz_lo) - mean(real(phz_lo(:)));
+phz_lo = real(phz_lo);
+% DO NOT subtract mean here to preserve absolute variance
 end
