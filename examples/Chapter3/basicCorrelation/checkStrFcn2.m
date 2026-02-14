@@ -12,7 +12,7 @@ clear; close %clc;
 
 % --- Parameters ---
 N = 128;            % Grid size
-dx = 1/N;           % Pixel size [m]
+dx = 1/N;           % Grid spacing [m]
 w_sig = 0.15;       % Covariance width [m]
 var_sig = 2.0;      % Process variance
 NR = 1000;          % Number of realizations
@@ -79,7 +79,7 @@ end
 D_from_G = 2 * (G_radial(1) - G_radial);
 
 % --- Plotting ---
-figure(1);
+f1 = figure(1);
 plot(rvals, D_th_radial, 'k-', 'LineWidth', 2); hold on;
 plot(rvals, D_radial, 'r--', 'LineWidth', 1.5);
 plot(rvals, D_from_G, 'b:', 'LineWidth', 1.5);
@@ -91,3 +91,5 @@ ylabel('Structure Function D_\phi(r)');
 legend('Theory', 'Direct Unbiased D', '2[\Gamma(0) - \Gamma(r)]', 'Biased D', ...
     'Location', 'SouthEast');
 title(sprintf('2-D Structure Function Verification (N_R=%i)', NR));
+
+exportgraphics(f1, 'checkStrFcn2D_Results.png');

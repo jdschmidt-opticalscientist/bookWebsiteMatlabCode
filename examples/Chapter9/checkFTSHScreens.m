@@ -28,13 +28,17 @@ maskPad = zeros(Npad, Npad);
 maskPad(idxCenter, idxCenter) = mask;
 
 % --- Atmospheric PSD ---
-fm = 5.92 / l0 / (2*pi); f0 = 1 / L0;
+kapm = 5.92 / l0 / (2*pi); % inner scale frequency [rad/m]
+kap0 = 2*pi / L0;          % outer scale frequency [rad/m]
+fm = kapm/(2*pi);          % convert to [cyc/m]
+f0 = kap0/L0;              % convert to [cyc/m]
 psdAtm = @(fx, fy) 0.023 * r0^(-5/3) * exp(-(sqrt(fx.^2+fy.^2)/fm).^2) ...
     ./ (fx.^2 + fy.^2 + f0^2).^(11/6);
 
 % --- Theory ---
 [~, r] = cart2pol(tauXPad, tauYPad);
-D_th = 6.88 * (r / r0).^(5/3); 
+D_th = 6.16 * r0.^(-5/3) .* (3/5*kap0^(-5/3) ...
+    - (r/kap0/2).^(5/6)/gamma(11/6) .* besselk(5/6, kap0*r));
 
 % --- Initialize Accumulators ---
 avgD_SH = zeros(Npad, Npad);
