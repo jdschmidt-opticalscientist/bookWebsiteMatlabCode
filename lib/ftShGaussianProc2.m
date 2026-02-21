@@ -3,10 +3,10 @@ function [phz_lo, phz_hi] = ftShGaussianProc2(N, delta, PSDFcn)
 %
 % Usage: [phz_lo, phz_hi] = ftShGaussianProc2(N, delta, PSDFcn)
 %
-% This function uses spectral partitioning to ensure absolute variance 
-% matches analytical theory. The high-frequency component (FFT) has its 
-% DC component zeroed out, and the true DC power is sampled only at the 
-% deepest subharmonic level to prevent double-counting.
+% This function uses additional frequencies beyond those available in the
+% FFT to boost low-frequency content. The high-frequency component (FFT) 
+% has its DC component zeroed out, and the true DC power is sampled only 
+% at the deepest subharmonic level to prevent double-counting.
 %
 % Inputs:
 %   N      - Number of samples per side

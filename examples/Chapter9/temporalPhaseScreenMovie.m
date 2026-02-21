@@ -42,7 +42,7 @@ for k = 1:num_frames
     
     % --- High Quality Plotting ---
     imagesc(x, x, phz);
-    axis image;
+    axis('image', 'xy');
     colormap(parula); % Perceptually uniform
     cb = colorbar;
     ylabel(cb, 'Phase [rad]', 'FontSize', 12);
@@ -51,7 +51,8 @@ for k = 1:num_frames
     clim([-45, 45]); 
     
     title(sprintf('Taylor Frozen Flow: t = %.2f s', t), 'FontSize', 14);
-    xlabel('x [m]'); ylabel('y [m]');
+    xlabel('x [m]');
+    ylabel('y [m]');
     set(gca, 'FontSize', 10, 'TickDir', 'out');
 
     % Capture frame and write
