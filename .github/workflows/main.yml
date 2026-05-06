@@ -58,18 +58,39 @@ jobs:
             addpath(genpath('core_book_code'));
             addpath(genpath('website_code'));
 
-            % Setup for headless plotting
+            % Prevent pop-up windows in the headless runner
             set(0, 'DefaultFigureVisible', 'off'); 
 
-            % Find and run all check scripts
-            examples = dir(fullfile('website_code', 'examples', '**', 'check*.m'));
-            for i = 1:length(examples)
-                cd(examples(i).folder);
-                run(examples(i).name);
-                % Save a copy of the figure for the Artifact upload
-                saveas(gcf, [examples(i).name '.png']); 
-            end
+            % Use a very specific name to avoid collision with your physics variables
+            CI_TEST_LIST = dir(fullfile(pwd, 'website_code', 'examples', '**', 'check*.m'));
 
+            for k = 1:length(CI_TEST_LIST)
+                testPath = fullfile(CI_TEST_LIST(k).folder, CI_TEST_LIST(k).name);
+                [~, testName] = fileparts(CI_TEST_LIST(k).name);
+                
+                fprintf('--- Running Test (%d/%d): %s ---\n', k, length(CI_TEST_LIST), testName);
+                
+                try
+                    % Run in a way that protects our loop variables from 'clear'
+                    % We change directory, run the script, and return
+                    origDir = pwd;
+                    cd(CI_TEST_LIST(k).folder);
+                    
+                    run(testName);
+                    
+                    % Save figure if one exists
+                    if ~isempty(get(0, 'Children'))
+                        saveas(gcf, [testName '.png']);
+                        fprintf('Result saved: %s.png\n', testName);
+                    end
+                    
+                    cd(origDir);
+                catch ME
+                    fprintf('FAILURE in %s: %s\n', testName, ME.message);
+                    % We'll rethrow at the end or exit to signal failure
+                    error('CI test failed on script: %s', testName);
+                end
+            end
       - name: Archive Results
         uses: actions/upload-artifact@v4
         if: always() # Upload even if a test fails
