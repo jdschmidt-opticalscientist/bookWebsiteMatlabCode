@@ -1,17 +1,48 @@
-name: MATLAB CI
-on: [push, pull_request]
+name: MATLAB CI (Build & Test)
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+    branches: ["*"]
 
 jobs:
-  run-quality-checks:
+  lint:
+    name: Style Suggestions
     runs-on: ubuntu-latest
+    continue-on-error: true # Keeps the badge green even if code isn't perfectly "MATLAB-esque"
     steps:
-      - name: Check out website code (Public)
+      - name: Check out website code
         uses: actions/checkout@v4
         with:
           path: website_code
 
-      - name: Check out book code (Private)
-        uses: actions/checkout@v4
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2
+
+      - name: Run MATLAB Linter (checkcode)
+        uses: matlab-actions/run-command@v2
+        with:
+          command: |
+            % Recursively find and lint all .m files for edification
+            mFiles = dir(fullfile('website_code', '**', '*.m'));
+            for i = 1:length(mFiles)
+              filePath = fullfile(mFiles(i).folder, mFiles(i).name);
+              diag = checkcode(filePath, '-all');
+              if isempty(diag)
+                fprintf('Linting: %s [CLEAN]\n', mFiles(i).name);
+              else
+                fprintf('Linting: %s [%d issues found]\n', mFiles(i).name, length(diag));
+                disp(struct2table(diag)); % Table format is much easier to read in logs
+              end
+            end
+  build-and-test:
+    name: Physics Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: website_code }
+      - uses: actions/checkout@v4
         with:
           repository: jdschmidt-opticalscientist/bookCode
           token: ${{ secrets.BOOK_CODE_TOKEN }}
@@ -20,36 +51,51 @@ jobs:
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2
 
-      - name: Run Tests and Linting
+      - name: Create CI Shield
+        run: |
+          # Create a temporary function file that is immune to 'clear all'
+          cat << 'EOF' > ci_shield.m
+          function ci_shield()
+              addpath(genpath('core_book_code'));
+              addpath(genpath('website_code'));
+              
+              % Headless plotting setup
+              set(0, 'DefaultFigureVisible', 'off'); 
+              
+              % Find all check scripts
+              list = dir(fullfile('website_code', 'examples', '**', 'check*.m'));
+              
+              for k = 1:length(list)
+                  [fpath, name] = fileparts(fullfile(list(k).folder, list(k).name));
+                  fprintf('--- Executing: %s ---\n', name);
+                  
+                  try
+                      cd(fpath);
+                      % This is the magic part: evalin('base', ...) protects 
+                      % the variables 'k' and 'list' from being cleared!
+                      evalin('base', name); 
+                      
+                      % Save plot if one exists
+                      if ~isempty(get(0, 'Children'))
+                          saveas(gcf, fullfile(getenv('GITHUB_WORKSPACE'), [name '.png']));
+                          fprintf('Plot captured for %s\n', name);
+                      end
+                  catch ME
+                      fprintf('CRASH in %s: %s\n', name, ME.message);
+                      exit(1); % Fail the build
+                  end
+              end
+          end
+          EOF
+
+      - name: Run Shielded Examples
         uses: matlab-actions/run-command@v2
         with:
-          command: |
-            % 1. Setup paths
-            addpath(genpath('core_book_code'));
-            addpath(genpath('website_code'));
-            
-            % 2. Verify visibility (Already confirmed by your last run)
-            if exist('ft2', 'file')
-                fprintf('SUCCESS: Private book functions are in the path.\n');
-            end
-            
-            % 3. Run Linter on your supplemental library files individually
-            % This avoids the "Unable to open file" error for the folder
-            libFiles = dir('website_code/lib/*.m');
-            for i = 1:length(libFiles)
-                fprintf('Linting: %s\n', libFiles(i).name);
-                diag = checkcode(fullfile(libFiles(i).folder, libFiles(i).name), '-all');
-                if ~isempty(diag), disp(diag); end
-            end
-            
-            % 4. Functional Test: Run an example and catch errors
-            try
-                fprintf('Executing checkXcorr...\n');
-                % Navigate to the example folder so it can find local dependencies
-                cd('website_code/examples/Chapter3/basicCorrelation');
-                checkXcorr; 
-                fprintf('SUCCESS: checkXcorr executed without errors.\n');
-            catch ME
-                fprintf('FAILURE: checkXcorr crashed with error: %s\n', ME.message);
-                exit(1); % Ensure the GitHub Action shows a "Fail" if the math is broken
-            end
+          command: ci_shield
+
+      - name: Upload Simulation Plots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: simulation-plots
+          path: "*.png"
