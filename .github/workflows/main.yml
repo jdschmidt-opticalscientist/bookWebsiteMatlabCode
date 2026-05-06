@@ -51,49 +51,48 @@ jobs:
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2
 
-      - name: Run All Examples
-        uses: matlab-actions/run-command@v2
-        with:
-          command: |
-            addpath(genpath('core_book_code'));
-            addpath(genpath('website_code'));
+      - name: Run All Examples (Isolated)
+        shell: bash
+        run: |
+          # 1. Find all example scripts starting with 'check'
+          # We use find to grab everything recursively
+          mapfile -t SCRIPTS < <(find website_code/examples -name "check*.m")
 
-            % Prevent pop-up windows in the headless runner
-            set(0, 'DefaultFigureVisible', 'off'); 
+          for SCRIPT_PATH in "${SCRIPTS[@]}"; do
+            DIR_NAME=$(dirname "$SCRIPT_PATH")
+            FILE_NAME=$(basename "$SCRIPT_PATH" .m)
+            
+            echo "------------------------------------------------------------"
+            echo "TESTING: $FILE_NAME in $DIR_NAME"
+            echo "------------------------------------------------------------"
 
-            % Use a very specific name to avoid collision with your physics variables
-            CI_TEST_LIST = dir(fullfile(pwd, 'website_code', 'examples', '**', 'check*.m'));
+            # 2. Run MATLAB in 'batch' mode
+            # Each 'matlab -batch' call is a fresh OS process. 
+            # A 'clear' inside the script cannot kill this Bash loop.
+            matlab -batch "
+              addpath(genpath('core_book_code'));
+              addpath(genpath('website_code'));
+              cd('$DIR_NAME');
+              
+              try
+                  % Run the example
+                  $FILE_NAME;
+                  
+                  % 3. Save a figure if one was generated
+                  if ~isempty(get(0, 'Children'))
+                      saveas(gcf, fullfile('${{ github.workspace }}', '$FILE_NAME.png'));
+                  end
+                  fprintf('SUCCESS: $FILE_NAME completed.\n');
+              catch ME
+                  fprintf('FAILURE: $FILE_NAME crashed with error: %s\n', ME.message);
+                  exit(1); % This tells Bash the test failed
+              end
+            "
+          done
 
-            for k = 1:length(CI_TEST_LIST)
-                testPath = fullfile(CI_TEST_LIST(k).folder, CI_TEST_LIST(k).name);
-                [~, testName] = fileparts(CI_TEST_LIST(k).name);
-                
-                fprintf('--- Running Test (%d/%d): %s ---\n', k, length(CI_TEST_LIST), testName);
-                
-                try
-                    % Run in a way that protects our loop variables from 'clear'
-                    % We change directory, run the script, and return
-                    origDir = pwd;
-                    cd(CI_TEST_LIST(k).folder);
-                    
-                    run(testName);
-                    
-                    % Save figure if one exists
-                    if ~isempty(get(0, 'Children'))
-                        saveas(gcf, [testName '.png']);
-                        fprintf('Result saved: %s.png\n', testName);
-                    end
-                    
-                    cd(origDir);
-                catch ME
-                    fprintf('FAILURE in %s: %s\n', testName, ME.message);
-                    % We'll rethrow at the end or exit to signal failure
-                    error('CI test failed on script: %s', testName);
-                end
-            end
-      - name: Archive Results
+      - name: Upload Simulation Plots
         uses: actions/upload-artifact@v4
-        if: always() # Upload even if a test fails
+        if: always()
         with:
-          name: simulation-results
-          path: website_code/examples/**/*.png
+          name: simulation-plots
+          path: "*.png"
