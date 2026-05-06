@@ -27,12 +27,15 @@ jobs:
             % Recursively find and lint all .m files for edification
             mFiles = dir(fullfile('website_code', '**', '*.m'));
             for i = 1:length(mFiles)
-                filePath = fullfile(mFiles(i).folder, mFiles(i).name);
-                fprintf('Linting: %s\n', mFiles(i).name);
-                diag = checkcode(filePath, '-all');
-                if ~isempty(diag), disp(diag); end
+              filePath = fullfile(mFiles(i).folder, mFiles(i).name);
+              diag = checkcode(filePath, '-all');
+              if isempty(diag)
+                fprintf('Linting: %s [CLEAN]\n', mFiles(i).name);
+              else
+                fprintf('Linting: %s [%d issues found]\n', mFiles(i).name, length(diag));
+                disp(struct2table(diag)); % Table format is much easier to read in logs
+              end
             end
-
   build-and-test:
     name: Physics Smoke Test
     runs-on: ubuntu-latest
