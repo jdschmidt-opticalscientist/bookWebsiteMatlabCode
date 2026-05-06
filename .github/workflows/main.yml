@@ -40,13 +40,9 @@ jobs:
     name: Physics Smoke Test
     runs-on: ubuntu-latest
     steps:
-      - name: Check out website code (Public)
-        uses: actions/checkout@v4
-        with:
-          path: website_code
-
-      - name: Check out book code (Private)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: { path: website_code }
+      - uses: actions/checkout@v4
         with:
           repository: jdschmidt-opticalscientist/bookCode
           token: ${{ secrets.BOOK_CODE_TOKEN }}
@@ -55,28 +51,28 @@ jobs:
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2
 
-      - name: Run Master Simulation
+      - name: Run All Examples
         uses: matlab-actions/run-command@v2
         with:
           command: |
-            % 1. Setup paths dynamically (avoids local startup.m conflicts)
             addpath(genpath('core_book_code'));
             addpath(genpath('website_code'));
 
-            % 2. Verify visibility
-            if exist('ft2', 'file')
-                fprintf('SUCCESS: Private book functions are in the path.\n');
-            else
-                error('FAILURE: Private book functions not found.');
+            % Setup for headless plotting
+            set(0, 'DefaultFigureVisible', 'off'); 
+
+            % Find and run all check scripts
+            examples = dir(fullfile('website_code', 'examples', '**', 'check*.m'));
+            for i = 1:length(examples)
+                cd(examples(i).folder);
+                run(examples(i).name);
+                % Save a copy of the figure for the Artifact upload
+                saveas(gcf, [examples(i).name '.png']); 
             end
 
-            % 3. Functional Test: Run an example and catch errors
-            try
-                fprintf('Executing checkXcorr...\n');
-                cd('website_code/examples/Chapter3/basicCorrelation');
-                checkXcorr; 
-                fprintf('SUCCESS: checkXcorr executed without errors.\n');
-            catch ME
-                fprintf('FAILURE: checkXcorr crashed with error: %s\n', ME.message);
-                rethrow(ME); % Fails the action while preserving the stack trace
-            end
+      - name: Archive Results
+        uses: actions/upload-artifact@v4
+        if: always() # Upload even if a test fails
+        with:
+          name: simulation-results
+          path: website_code/examples/**/*.png
